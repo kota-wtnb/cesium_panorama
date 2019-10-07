@@ -1,118 +1,150 @@
-// トークン設定
-Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI2M2VkOTIxNi1jNTFkLTRiZWYtOWQ0MS0wZmM4MzQ4NmE4YzEiLCJpZCI6NDY1Niwic2NvcGVzIjpbImFzciIsImdjIl0sImlhdCI6MTU0MTM4NDY3N30.I2dU0XE3iwrtcvwsFasR5kDiQADiDMMpfbFVwHmeHQg';
 
+import * as THREE from '../node_modules/three/build/three.module.js';
 
-// 視点リストの作成
-function viewPoints(_label, _latitude, _longitude, _altitude, _heading, _pitch, _range) {
-    this.label = _label;
-    this.latitude = _latitude;
-    this.longitude = _longitude;
-    this.altitude = _altitude;
-    this.heading = _heading;
-    this.pitch = _pitch;
-    this.range = _range;
-}
-var viewPointsArray = [];
-viewPointsArray[0] = new viewPoints("日本全国", 36.251583, 138.405714, 0, -42, -45, 1477669);
-viewPointsArray[1] = new viewPoints("パノラマボール", 33.839460, 134.494809, 1000, 0, 0, 1000);
-viewPointsArray[2] = new viewPoints("徳島県那賀町", 33.7983, 134.2736, 0, 0, -30, 50000);
+import Stats from '../node_modules/three/examples/jsm/libs/stats.module.js';
+import { GUI } from '../node_modules/three/examples/jsm/libs/dat.gui.module.js';
+import { OrbitControls } from '../node_modules/three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
+import { DecalGeometry } from '../node_modules/three/examples/jsm/geometries/DecalGeometry.js';
 
-
-// ビューアの作成
-var viewer = new Cesium.Viewer('cesiumContainer', {
-    timeline: false,
-    animation: false
+var container = document.getElementById('container');
+var renderer, scene, camera, stats;
+var mesh;
+var raycaster;
+var line;
+var intersection = {
+    intersects: false,
+    point: new THREE.Vector3(),
+    normal: new THREE.Vector3()
+};
+var mouse = new THREE.Vector2();
+var textureLoader = new THREE.TextureLoader();
+var decalDiffuse = textureLoader.load('../img/decal-diffuse.png');
+var decalNormal = textureLoader.load('../img/decal-normal.jpg');
+var decalMaterial = new THREE.MeshPhongMaterial({
+    specular: 0x444444,
+    map: decalDiffuse,
+    normalMap: decalNormal,
+    normalScale: new THREE.Vector2(1, 1),
+    shininess: 30,
+    transparent: true,
+    depthTest: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: - 4,
+    wireframe: false
 });
-var scene = viewer.scene;
-
-// czmlの読み込み・表示
-function czmlData(_label, _url) {
-    this.lable = _label;
-    this.url = _url;
-}
-
-var czmlDataArray = [];
-czmlDataArray[0] = new czmlData("panorama", "../czml/panorama.czml");
-viewer.dataSources.add(Cesium.CzmlDataSource.load(czmlDataArray[0].url));
-
-
-// オブジェクトのクリックとアクション
-var handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
-handler.setInputAction(
-    function (movement) {
-        var photoBillBoard = scene.pick(movement.position);
-        if (photoBillBoard) {
-            trackPanoramaBall(photoBillBoard);
+var decals = [];
+var mouseHelper;
+var position = new THREE.Vector3();
+var orientation = new THREE.Euler();
+var size = new THREE.Vector3(10, 10, 10);
+var params = {
+    minScale: 10,
+    maxScale: 20,
+    viewAngle: 60,
+    rotate: true,
+    isShoot: true,
+    clear: function () {
+        removeDecals();
+    }
+};
+window.addEventListener('load', init);
+function init() {
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    container.appendChild(renderer.domElement);
+    stats = new Stats();
+    container.appendChild(stats.dom);
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.z = 120;
+    camera.target = new THREE.Vector3();
+    var controls = new OrbitControls(camera, renderer.domElement);
+    // controls.minDistance = 50;
+    // controls.maxDistance = 200;
+    scene.add(new THREE.AmbientLight(0x443333));
+    var light = new THREE.DirectionalLight(0xffddcc, 1);
+    light.position.set(1, 0.75, 0.5);
+    scene.add(light);
+    var light = new THREE.DirectionalLight(0xccccff, 1);
+    light.position.set(- 1, 0.75, - 0.5);
+    scene.add(light);
+    var geometry = new THREE.BufferGeometry();
+    geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+    line = new THREE.Line(geometry, new THREE.LineBasicMaterial());
+    scene.add(line);
+    loadLeePerrySmith();
+    raycaster = new THREE.Raycaster();
+    mouseHelper = new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 10), new THREE.MeshNormalMaterial());
+    mouseHelper.visible = false;
+    scene.add(mouseHelper);
+    window.addEventListener('resize', onWindowResize, false);
+    var moved = false;
+    controls.addEventListener('change', function () {
+        moved = true;
+    });
+    window.addEventListener('mousedown', function () {
+        moved = false;
+    }, false);
+    window.addEventListener('mouseup', function () {
+        checkIntersection();
+        if (!moved && intersection.intersects && params.isShoot) shoot();
+    });
+    window.addEventListener('mousemove', onTouchMove);
+    window.addEventListener('touchmove', onTouchMove);
+    function onTouchMove(event) {
+        var x, y;
+        if (event.changedTouches) {
+            x = event.changedTouches[0].pageX;
+            y = event.changedTouches[0].pageY;
+        } else {
+            x = event.clientX;
+            y = event.clientY;
         }
-    },
-    Cesium.ScreenSpaceEventType.LEFT_CLICK
-);
-
-
-// 視点変更
-function changeViewPoint(number, delay) {
-    var newLatitude = viewPointsArray[number].latitude;
-    var newLongitude = viewPointsArray[number].longitude;
-    var newAltitude = viewPointsArray[number].altitude;
-    var newHeading = Cesium.Math.toRadians(viewPointsArray[number].heading);
-    var newPitch = Cesium.Math.toRadians(viewPointsArray[number].pitch);
-    var newRange = viewPointsArray[number].range;
-
-    var center = Cesium.Cartesian3.fromDegrees(newLongitude, newLatitude, newAltitude);
-    var boundingSphere = new Cesium.BoundingSphere(center, newRange);
-    var headingPitchRange = new Cesium.HeadingPitchRange(newHeading, newPitch, newRange);
-
-    viewer.camera.constrainedAxis = Cesium.Cartesian3.UNIT_Z;
-    viewer.camera.flyToBoundingSphere(boundingSphere, {
-        duration: delay,
-        offset: headingPitchRange,
-        easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
-    });
+        mouse.x = (x / window.innerWidth) * 2 - 1;
+        mouse.y = - (y / window.innerHeight) * 2 + 1;
+        checkIntersection();
+    }
+    function checkIntersection() {
+        if (!mesh) return;
+        raycaster.setFromCamera(mouse, camera);
+        var intersects = raycaster.intersectObjects([mesh]);
+        if (intersects.length > 0) {
+            var p = intersects[0].point;
+            console.log(intersects);
+            //var c = intersects[0].color;
+            mouseHelper.position.copy(p);
+            intersection.point.copy(p);
+            var n = intersects[0].face.normal.clone();
+            n.transformDirection(mesh.matrixWorld);
+            n.multiplyScalar(10);
+            n.add(intersects[0].point);
+            intersection.normal.copy(intersects[0].face.normal);
+            mouseHelper.lookAt(n);
+            var positions = line.geometry.attributes.position;
+            positions.setXYZ(0, p.x, p.y, p.z);
+            positions.setXYZ(1, n.x, n.y, n.z);
+            positions.needsUpdate = true;
+            intersection.intersects = true;
+        } else {
+            intersection.intersects = false;
+        }
+    }
+    var gui = new GUI();
+    gui.add(params, 'minScale', 1, 30);
+    gui.add(params, 'maxScale', 1, 30);
+    gui.add(params, 'rotate');
+    gui.add(params, 'isShoot');
+    gui.add(params, 'clear');
+    gui.open();
+    onWindowResize();
+    animate();
 }
-
-var isStart = false;
-
-// カメラ情報取得
-function getCameraInfo() {
-    var longitude = viewer.camera.positionCartographic.longitude;
-    var latitude = viewer.camera.positionCartographic.latitude;
-    var height = viewer.camera.positionCartographic.height;
-    console.log(Cesium.Math.toDegrees(longitude) + "," + Cesium.Math.toDegrees(latitude));
-    console.log(viewer.camera);
-    isStart = true;
-}
-
-// パノラマボール追跡
-function trackPanoramaBall(photoBillBoard) {
-    // viewer.trackedEntity = photoBillBoard.id;
-    // viewer.camera.flyTo({
-    //     destination: Cesium.Cartesian3.fromDegrees(134.49480649572698, 33.83732763700000, 1000),
-    //     orientation: {
-    //         heading: Cesium.Math.toRadians(0.0),
-    //         pitch: Cesium.Math.toRadians(0.0),
-    //         roll: 0.0
-    //     }
-    // });
-    changeViewPoint(1, 3.0);
-}
-
-// パノラマビューア
-// HTML読み込み後実行
-window.onload = function () {
-    viewer.camera.setView({
-        destination: Cesium.Cartesian3.fromDegrees(138.73459144327657, 38.38860846354088, 2956183.115121568)
-    });
-
-    setTimeout('changeViewPoint(2, 3.0)', 5000);
-
-    var width = document.getElementById('stage').clientWidth;
-    var height = document.getElementById('stage').clientHeight;
-
-    var scene = new THREE.Scene();
-
+function loadLeePerrySmith() {
     var geometry = new THREE.SphereGeometry(5, 60, 40);
     geometry.scale(-1, 1, 1);
-
     var material = new THREE.MeshBasicMaterial({
         map: THREE.ImageUtils.loadTexture('../img/bg_center.png'),
         transparent: true,
@@ -120,46 +152,34 @@ window.onload = function () {
     });
 
     var sphere = new THREE.Mesh(geometry, material);
+    mesh = sphere;
     scene.add(sphere);
-
-    var camera = new THREE.PerspectiveCamera(75, width / height, 1, 1000);
-    camera.position.set(0, 0, 20);
-    camera.lookAt(sphere.position);
-
-    var renderer = new THREE.WebGLRenderer({ alpha: true });
-    renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0)
-    document.getElementById('stage').appendChild(renderer.domElement);
-    renderer.render(scene, camera);
-
-    var controls = new THREE.OrbitControls(camera, renderer.domElement);
-
-    var easeOut = function (p) {
-        return p * (2 - p);
-    };
-
-    var progress = 0.0;
-
-    function render() {
-        requestAnimationFrame(render);
-
-        if (isStart) {
-            document.getElementById('stage').style.zIndex = 1;
-            if (progress < 1.0) {
-                camera.position.z = 10 - 9 * easeOut(progress);
-                //material.opacity = easeOut(progress);
-                progress += 0.02
-            }
-        }
-        renderer.render(scene, camera);
-        controls.update();
-        //console.log(camera.position);
-    }
-    render();
-
-    // リサイズ処理
-    function onResize() {
-        // 
-    }
 }
-
+function shoot() {
+    position.copy(intersection.point);
+    orientation.copy(mouseHelper.rotation);
+    if (params.rotate) orientation.z = Math.random() * 2 * Math.PI;
+    var scale = params.minScale + Math.random() * (params.maxScale - params.minScale);
+    size.set(scale, scale, scale);
+    var material = decalMaterial.clone();
+    material.color.setHex(0xffffff);
+    var m = new THREE.Mesh(new DecalGeometry(mesh, position, orientation, size), material);
+    decals.push(m);
+    scene.add(m);
+}
+function removeDecals() {
+    decals.forEach(function (d) {
+        scene.remove(d);
+    });
+    decals = [];
+}
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+    stats.update();
+}
