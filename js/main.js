@@ -7,6 +7,8 @@ import { OrbitControls } from '../node_modules/three/examples/jsm/controls/Orbit
 import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoader.js';
 import { DecalGeometry } from '../node_modules/three/examples/jsm/geometries/DecalGeometry.js';
 
+var icons = [];
+
 var container = document.getElementById('container');
 var renderer, scene, camera, stats;
 var mesh;
@@ -19,20 +21,17 @@ var intersection = {
 };
 var mouse = new THREE.Vector2();
 var textureLoader = new THREE.TextureLoader();
-var decalDiffuse = textureLoader.load('../img/decal-diffuse.png');
-var decalNormal = textureLoader.load('../img/decal-normal.jpg');
-var decalMaterial = new THREE.MeshPhongMaterial({
-    specular: 0x444444,
+var decalDiffuse = textureLoader.load('../img/caution.gif');
+var decalNormal = textureLoader.load('../img/caution.gif');
+var decalMaterial = new THREE.MeshBasicMaterial({
     map: decalDiffuse,
-    normalMap: decalNormal,
-    normalScale: new THREE.Vector2(1, 1),
-    shininess: 30,
     transparent: true,
     depthTest: true,
     depthWrite: false,
     polygonOffset: true,
     polygonOffsetFactor: - 4,
-    wireframe: false
+    wireframe: false,
+    //opacity: 0.3
 });
 var decals = [];
 var mouseHelper;
@@ -40,10 +39,7 @@ var position = new THREE.Vector3();
 var orientation = new THREE.Euler();
 var size = new THREE.Vector3(10, 10, 10);
 var params = {
-    minScale: 10,
-    maxScale: 20,
-    viewAngle: 60,
-    rotate: true,
+    scale: 1,
     isShoot: true,
     clear: function () {
         removeDecals();
@@ -55,11 +51,11 @@ function init() {
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     container.appendChild(renderer.domElement);
-    stats = new Stats();
-    container.appendChild(stats.dom);
+    // stats = new Stats();
+    // container.appendChild(stats.dom);
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
-    camera.position.z = 120;
+    camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.z = -1;
     camera.target = new THREE.Vector3();
     var controls = new OrbitControls(camera, renderer.domElement);
     // controls.minDistance = 50;
@@ -75,7 +71,7 @@ function init() {
     geometry.setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
     line = new THREE.Line(geometry, new THREE.LineBasicMaterial());
     scene.add(line);
-    loadLeePerrySmith();
+    loadPanorama();
     raycaster = new THREE.Raycaster();
     mouseHelper = new THREE.Mesh(new THREE.BoxBufferGeometry(1, 1, 10), new THREE.MeshNormalMaterial());
     mouseHelper.visible = false;
@@ -91,6 +87,7 @@ function init() {
     window.addEventListener('mouseup', function () {
         checkIntersection();
         if (!moved && intersection.intersects && params.isShoot) shoot();
+        if (!moved && intersection.intersects && !params.isShoot) clickIcon();
     });
     window.addEventListener('mousemove', onTouchMove);
     window.addEventListener('touchmove', onTouchMove);
@@ -113,8 +110,6 @@ function init() {
         var intersects = raycaster.intersectObjects([mesh]);
         if (intersects.length > 0) {
             var p = intersects[0].point;
-            console.log(intersects);
-            //var c = intersects[0].color;
             mouseHelper.position.copy(p);
             intersection.point.copy(p);
             var n = intersects[0].face.normal.clone();
@@ -123,26 +118,38 @@ function init() {
             n.add(intersects[0].point);
             intersection.normal.copy(intersects[0].face.normal);
             mouseHelper.lookAt(n);
-            var positions = line.geometry.attributes.position;
-            positions.setXYZ(0, p.x, p.y, p.z);
-            positions.setXYZ(1, n.x, n.y, n.z);
-            positions.needsUpdate = true;
+            // var positions = line.geometry.attributes.position;
+            // positions.setXYZ(0, p.x, p.y, p.z);
+            // positions.setXYZ(1, n.x, n.y, n.z);
+            // positions.needsUpdate = true;
             intersection.intersects = true;
         } else {
             intersection.intersects = false;
         }
     }
+
+    function clickIcon() {
+        if (icons.length > 0) {
+            raycaster.intersectObjects(scene.children).forEach(function (r) {
+                icons.forEach(function (i) {
+                    if (r.object.uuid == i.uuid) {
+                        createMessageBox(i.message);
+                    }
+                });
+            });
+        }
+    }
     var gui = new GUI();
-    gui.add(params, 'minScale', 1, 30);
-    gui.add(params, 'maxScale', 1, 30);
-    gui.add(params, 'rotate');
+    gui.add(params, 'scale', 0.1, 1);
     gui.add(params, 'isShoot');
     gui.add(params, 'clear');
     gui.open();
     onWindowResize();
     animate();
 }
-function loadLeePerrySmith() {
+
+// パノラマオブジェクトを作成、シーンに追加
+function loadPanorama() {
     var geometry = new THREE.SphereGeometry(5, 60, 40);
     geometry.scale(-1, 1, 1);
     var material = new THREE.MeshBasicMaterial({
@@ -155,17 +162,53 @@ function loadLeePerrySmith() {
     mesh = sphere;
     scene.add(sphere);
 }
+
+var uuid;
+
+function createMessageBox(message) {
+    var element = document.getElementById('message-container');
+    if (element) {
+        element.parentNode.removeChild(element);
+    }
+    var div = document.createElement('div');
+    div.setAttribute("id", "message-container");
+    div.innerText = message;
+    document.getElementById('container').appendChild(div);
+}
+
 function shoot() {
     position.copy(intersection.point);
     orientation.copy(mouseHelper.rotation);
-    if (params.rotate) orientation.z = Math.random() * 2 * Math.PI;
-    var scale = params.minScale + Math.random() * (params.maxScale - params.minScale);
+    var scale = params.scale;
     size.set(scale, scale, scale);
     var material = decalMaterial.clone();
-    material.color.setHex(0xffffff);
     var m = new THREE.Mesh(new DecalGeometry(mesh, position, orientation, size), material);
-    decals.push(m);
-    scene.add(m);
+    uuid = m.uuid;
+    var icon = {};
+    icon.uuid = m.uuid;
+    icon.message = window.prompt("メッセージを入力してください", "");
+    if (icon.message == "") {
+        icon.message = "No Message";
+        decals.push(m);
+        scene.add(m);
+        icons.push(icon);
+    }
+    if (icon.message == null) {
+        removeDecal(m.uuid);
+    } else {
+        decals.push(m);
+        scene.add(m);
+        icons.push(icon);
+    }
+
+}
+
+function removeDecal(uuid) {
+    decals.forEach(function (d) {
+        if (d.uuid == uuid) {
+            scene.remove(d);
+        }
+    });
 }
 function removeDecals() {
     decals.forEach(function (d) {
@@ -181,5 +224,14 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
-    stats.update();
+    if (camera.position.z > 5) {
+        decals.forEach(function (d) {
+            d.visible = false;
+        });
+    } else {
+        decals.forEach(function (d) {
+            d.visible = true;
+        });
+    }
+    //stats.update();
 }
