@@ -8,6 +8,7 @@ import { GLTFLoader } from '../node_modules/three/examples/jsm/loaders/GLTFLoade
 import { DecalGeometry } from '../node_modules/three/examples/jsm/geometries/DecalGeometry.js';
 
 var icons = [];
+var isShoot = true;
 
 var container = document.getElementById('container');
 var renderer, scene, camera, stats;
@@ -40,7 +41,6 @@ var orientation = new THREE.Euler();
 var size = new THREE.Vector3(10, 10, 10);
 var params = {
     scale: 1,
-    isShoot: true,
     clear: function () {
         removeDecals();
     }
@@ -86,8 +86,8 @@ function init() {
     }, false);
     window.addEventListener('mouseup', function () {
         checkIntersection();
-        if (!moved && intersection.intersects && params.isShoot) shoot();
-        if (!moved && intersection.intersects && !params.isShoot) clickIcon();
+        if (!moved && intersection.intersects && isShoot) shoot();
+        if (!moved && intersection.intersects && !isShoot) clickIcon();
     });
     window.addEventListener('mousemove', onTouchMove);
     window.addEventListener('touchmove', onTouchMove);
@@ -139,11 +139,10 @@ function init() {
             });
         }
     }
-    var gui = new GUI();
-    gui.add(params, 'scale', 0.1, 1);
-    gui.add(params, 'isShoot');
-    gui.add(params, 'clear');
-    gui.open();
+    // var gui = new GUI();
+    // gui.add(params, 'scale', 0.1, 1);
+    // gui.add(params, 'clear');
+    // gui.open();
     onWindowResize();
     animate();
 }
@@ -153,7 +152,7 @@ function loadPanorama() {
     var geometry = new THREE.SphereGeometry(5, 60, 40);
     geometry.scale(-1, 1, 1);
     var material = new THREE.MeshBasicMaterial({
-        map: THREE.ImageUtils.loadTexture('../img/bg_center.png'),
+        map: new THREE.TextureLoader().load('../img/bg_center.png'),
         transparent: true,
         opacity: 1.0
     });
@@ -176,6 +175,8 @@ function createMessageBox(message) {
     document.getElementById('container').appendChild(div);
 }
 
+var icon = {};
+
 function shoot() {
     position.copy(intersection.point);
     orientation.copy(mouseHelper.rotation);
@@ -183,30 +184,35 @@ function shoot() {
     size.set(scale, scale, scale);
     var material = decalMaterial.clone();
     var m = new THREE.Mesh(new DecalGeometry(mesh, position, orientation, size), material);
-    uuid = m.uuid;
-    var icon = {};
-    icon.uuid = m.uuid;
-    icon.message = window.prompt("メッセージを入力してください", "");
-    if (icon.message == "") {
-        icon.message = "No Message";
-        decals.push(m);
-        scene.add(m);
-        icons.push(icon);
-    }
-    if (icon.message == null) {
-        removeDecal(m.uuid);
-    } else {
-        decals.push(m);
-        scene.add(m);
-        icons.push(icon);
-    }
 
+    decals.push(m);
+    scene.add(m);
+
+    inputMessageWithIcon(m.uuid);
+}
+
+function inputMessageWithIcon(_uuid) {
+    icon = {};
+    icon.uuid = _uuid;
+    icon.message = window.prompt("メッセージを入力してください", "");
+
+    // メッセージが空欄、キャンセルの場合
+    if (icon.message == "") {
+        icon.message == "メッセージがありません。";
+        icons.push(icon);
+    } else if (icon.message == null) {
+        removeDecal(_uuid);
+    } else {
+        icons.push(icon);
+        console.log(icons);
+    }
 }
 
 function removeDecal(uuid) {
-    decals.forEach(function (d) {
+    decals.forEach(function (d, index) {
         if (d.uuid == uuid) {
             scene.remove(d);
+            decals.splice(index, 1);
         }
     });
 }
@@ -224,7 +230,11 @@ function onWindowResize() {
 function animate() {
     requestAnimationFrame(animate);
     renderer.render(scene, camera);
-    if (camera.position.z > 5) {
+
+    var distance = Math.sqrt(Math.pow(camera.position.x, 2) + Math.pow(camera.position.y, 2) + Math.pow(camera.position.z, 2));
+    document.getElementById('status').textContent = distance;
+
+    if (distance > 5) {
         decals.forEach(function (d) {
             d.visible = false;
         });
@@ -235,3 +245,12 @@ function animate() {
     }
     //stats.update();
 }
+function switchMode(e) {
+    modeButton.classList.toggle('edit-mode');
+    modeButton.classList.toggle('view-mode');
+    modeButton.textContent = (modeButton.textContent == "編集モード") ? "閲覧モード" : "編集モード";
+    isShoot = !isShoot;
+    e.stopPropagation();
+}
+var modeButton = document.getElementById('mode-button');
+modeButton.addEventListener('mouseup', switchMode);
