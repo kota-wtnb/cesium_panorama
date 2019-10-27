@@ -62,6 +62,7 @@ function init() {
     camera.position.z = -1;
     camera.target = new THREE.Vector3();
     var controls = new OrbitControls(camera, renderer.domElement);
+    controls.enablePan = false;
     // controls.minDistance = 50;
     // controls.maxDistance = 200;
     scene.add(new THREE.AmbientLight(0x443333));

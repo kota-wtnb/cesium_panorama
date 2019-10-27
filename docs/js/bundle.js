@@ -58336,6 +58336,7 @@ function init() {
     camera.position.z = -1;
     camera.target = new three__WEBPACK_IMPORTED_MODULE_0__["Vector3"]();
     var controls = new three_examples_jsm_controls_OrbitControls_js__WEBPACK_IMPORTED_MODULE_3__["OrbitControls"](camera, renderer.domElement);
+    controls.enablePan = false;
     // controls.minDistance = 50;
     // controls.maxDistance = 200;
     scene.add(new three__WEBPACK_IMPORTED_MODULE_0__["AmbientLight"](0x443333));
