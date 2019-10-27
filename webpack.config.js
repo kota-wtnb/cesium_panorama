@@ -7,6 +7,7 @@ const MODE = "development";
 const enabledSourceMap = MODE === "development";
 
 module.exports = {
+    devtool: 'source-map',
     mode: MODE,
     entry: './src/js/main.js',
     output: {
