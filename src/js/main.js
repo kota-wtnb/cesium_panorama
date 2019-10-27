@@ -26,8 +26,8 @@ var intersection = {
 };
 var mouse = new THREE.Vector2();
 var textureLoader = new THREE.TextureLoader();
-var decalDiffuse = textureLoader.load('../img/caution.gif');
-var decalNormal = textureLoader.load('../img/caution.gif');
+var decalDiffuse = textureLoader.load('img/caution.gif');
+var decalNormal = textureLoader.load('img/caution.gif');
 var decalMaterial = new THREE.MeshBasicMaterial({
     map: decalDiffuse,
     transparent: true,

@@ -58300,8 +58300,8 @@ var intersection = {
 };
 var mouse = new three__WEBPACK_IMPORTED_MODULE_0__["Vector2"]();
 var textureLoader = new three__WEBPACK_IMPORTED_MODULE_0__["TextureLoader"]();
-var decalDiffuse = textureLoader.load('../img/caution.gif');
-var decalNormal = textureLoader.load('../img/caution.gif');
+var decalDiffuse = textureLoader.load('img/caution.gif');
+var decalNormal = textureLoader.load('img/caution.gif');
 var decalMaterial = new three__WEBPACK_IMPORTED_MODULE_0__["MeshBasicMaterial"]({
     map: decalDiffuse,
     transparent: true,
