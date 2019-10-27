@@ -58285,6 +58285,14 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+var isPC = true;
+
+if (navigator.userAgent.match(/(iPhone|iPad|iPod|Android)/i)) {
+    isPC = false;
+} else {
+    isPC = true;
+}
+
 var icons = [];
 var isShoot = true;
 
@@ -58360,22 +58368,41 @@ function init() {
     controls.addEventListener('change', function () {
         moved = true;
     });
-    window.addEventListener('mousedown', function () {
-        moved = false;
-    }, false);
-    window.addEventListener('mouseup', function () {
-        checkIntersection();
-        if (!moved && intersection.intersects && isShoot) shoot();
-        if (!moved && intersection.intersects && !isShoot) clickIcon();
-    });
-    window.addEventListener('mousemove', onTouchMove);
-    window.addEventListener('touchmove', onTouchMove);
+
+    if (isPC) {
+        window.addEventListener('mousedown', function () {
+            moved = false;
+        }, false);
+
+        window.addEventListener('mouseup', function () {
+            checkIntersection();
+            if (!moved && intersection.intersects && isShoot) shoot();
+            if (!moved && intersection.intersects && !isShoot) clickIcon();
+        });
+
+        window.addEventListener('mousemove', onTouchMove);
+    } else {
+        window.addEventListener('touchstart', function () {
+            moved = false;
+        }, false);
+
+        window.addEventListener('touchend', function (event) {
+            onTouchMove(event);
+            if (!moved && intersection.intersects && isShoot) shoot();
+            if (!moved && intersection.intersects && !isShoot) clickIcon();
+        });
+
+        //window.addEventListener('touchmove', onTouchMove);
+    }
+
     function onTouchMove(event) {
         var x, y;
         if (event.changedTouches) {
+
             x = event.changedTouches[0].pageX;
             y = event.changedTouches[0].pageY;
         } else {
+
             x = event.clientX;
             y = event.clientY;
         }
@@ -58531,7 +58558,14 @@ function switchMode(e) {
     e.stopPropagation();
 }
 var modeButton = document.getElementById('mode-button');
-modeButton.addEventListener('mouseup', switchMode);
+
+if (isPC) {
+    modeButton.addEventListener('mouseup', switchMode);
+} else {
+    modeButton.addEventListener('touchend', switchMode);
+}
+
+
 
 
 /***/ }),

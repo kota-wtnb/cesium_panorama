@@ -52,8 +52,8 @@ module.exports = {
     devServer: {
         contentBase: "docs",
         open: true,
-        host: '192.168.33.10',
-        port: 8000
+        host: '0.0.0.0',
+        port: 3000
     },
     plugins: [
         new MiniCssExtractPlugin({
