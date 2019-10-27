@@ -58430,7 +58430,7 @@ function loadPanorama() {
     var geometry = new three__WEBPACK_IMPORTED_MODULE_0__["SphereGeometry"](5, 60, 40);
     geometry.scale(-1, 1, 1);
     var material = new three__WEBPACK_IMPORTED_MODULE_0__["MeshBasicMaterial"]({
-        map: new three__WEBPACK_IMPORTED_MODULE_0__["TextureLoader"]().load('../img/bg_center.png'),
+        map: new three__WEBPACK_IMPORTED_MODULE_0__["TextureLoader"]().load('cesium_panorama/img/bg_center.png'),
         transparent: true,
         opacity: 1.0
     });

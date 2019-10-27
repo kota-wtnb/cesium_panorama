@@ -156,7 +156,7 @@ function loadPanorama() {
     var geometry = new THREE.SphereGeometry(5, 60, 40);
     geometry.scale(-1, 1, 1);
     var material = new THREE.MeshBasicMaterial({
-        map: new THREE.TextureLoader().load('../img/bg_center.png'),
+        map: new THREE.TextureLoader().load('cesium_panorama/img/bg_center.png'),
         transparent: true,
         opacity: 1.0
     });
